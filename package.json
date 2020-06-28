@@ -1,0 +1,8 @@
+{
+  "name": "charity-app-buildpack",
+  "version": "0.0.1",
+  "engines": {
+    "node": "12.x",
+    "yarn": "1.22.x"
+  }
+}

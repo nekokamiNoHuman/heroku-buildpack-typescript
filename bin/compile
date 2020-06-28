@@ -39,14 +39,14 @@ function indent() {
   esac
 }
 
-function run_npm() {
+function run_yarn() {
   command="$1"
 
   cd $BUILD_DIR
   HOME="$BUILD_DIR" $VENDORED_NODE/bin/node $VENDORED_NPM/cli.js $command 2>&1 | indent
 
   if [ "${PIPESTATUS[*]}" != "0 0" ]; then
-    echo " !     Failed to $command dependencies with npm"
+    echo " !     Failed to $command dependencies with yarn"
     exit 1
   fi
 }
@@ -100,21 +100,21 @@ function package_download() {
 }
 
 bootstrap_node=$(mktmpdir bootstrap_node)
-package_download "nodejs" "0.4.7" $bootstrap_node
+package_download "nodejs" "12.18.0" $bootstrap_node
 
 # make some associative arrays
 declare -A engine_versions
 declare -A engine_defaults
 declare -A engine_requests
 
-engine_defaults["node"]="0.4.7"
-engine_defaults["npm"]="1.0.106"
+engine_defaults["node"]="12.18.0"
+engine_defaults["yarn"]="1.22.4"
 
 engine_versions["node"]=$(manifest_versions "nodejs")
 engine_requests["node"]=$(package_engine_version "node")
 
-engine_versions["npm"]=$(manifest_versions "npm")
-engine_requests["npm"]=$(package_engine_version "npm")
+engine_versions["yarn"]=$(manifest_versions "yarn")
+engine_requests["yarn"]=$(package_engine_version "yarn")
 
 echo "-----> Resolving engine versions"
 
@@ -124,7 +124,7 @@ if [ "${engine_requests["node"]}" == "" ]; then
   echo "WARNING: No version of Node.js specified in package.json, see:" | indent
   echo "https://devcenter.heroku.com/articles/nodejs-versions" | indent
   echo
-  echo "WARNING: The default version of Node.js and npm on Heroku will begin" | indent
+  echo "WARNING: The default version of Node.js and yarn on Heroku will begin" | indent
   echo "tracking the latest stable release starting September 1, 2012."  | indent
   echo
 fi
@@ -132,24 +132,18 @@ fi
 NODE_VERSION=$(package_resolve_version "node")
 echo "Using Node.js version: ${NODE_VERSION}" | indent
 
-NPM_VERSION=$(package_resolve_version "npm")
-echo "Using npm version: ${NPM_VERSION}" | indent
-
-# s3 packages
-NODE_PACKAGE="http://${S3_BUCKET}.s3.amazonaws.com/nodejs-${NODE_VERSION}.tgz"
-NPM_PACKAGE="http://${S3_BUCKET}.s3.amazonaws.com/npm-${NPM_VERSION}.tgz"
-SCONS_PACKAGE="http://${S3_BUCKET}.s3.amazonaws.com/scons-${SCONS_VERSION}.tgz"
+NPM_VERSION=$(package_resolve_version "yarn")
+echo "Using yarn version: ${NPM_VERSION}" | indent
 
 # vendor directories
 VENDORED_NODE="$(mktmpdir node)"
-VENDORED_NPM="$(mktmpdir npm)"
+VENDORED_NPM="$(mktmpdir yarn)"
 VENDORED_SCONS="$(mktmpdir scons)"
 
 # download and unpack packages
 echo "-----> Fetching Node.js binaries"
 package_download "nodejs" "${NODE_VERSION}" "${VENDORED_NODE}"
-package_download "npm" "${NPM_VERSION}" "${VENDORED_NPM}"
-package_download "scons" "${SCONS_VERSION}" "${VENDORED_SCONS}"
+package_download "yarn" "${NPM_VERSION}" "${VENDORED_NPM}"
 
 # vendor node into the slug
 PATH="$BUILD_DIR/bin:$PATH"
@@ -163,25 +157,19 @@ INCLUDE_PATH="$VENDORED_NODE/include"
 export CPATH="$INCLUDE_PATH"
 export CPPPATH="$INCLUDE_PATH"
 
-# install dependencies with npm
-echo "-----> Installing dependencies with npm"
-run_npm "install --production"
-run_npm "rebuild"
+# install dependencies with yarn
+echo "-----> Installing dependencies with yarn"
+run_yarn "install --production"
+run_yarn "rebuild"
 echo "Dependencies installed" | indent
 
 # compile Typescript sources
 echo "-----> Compiling typescript source"
 mkdir -p $BUILD_DIR/ts
-#compile tsc files  
+#compile tsc files
 
-$BUILD_DIR/node_modules/typescript/bin/tsc --out $BUILD_DIR/ts `find . -name "*.ts" -maxdepth 5 | grep -v node_modules | grep -v "\.d.ts"`
-
-
-if [ -f $BUILD_DIR/build-assets.js ]
-then
-    echo "-----> Building assets"
-    env node $BUILD_DIR/build-assets.js
-fi
+# $BUILD_DIR/node_modules/typescript/bin/tsc --out $BUILD_DIR/ts `find . -name "*.ts" -maxdepth 5 | grep -v node_modules | grep -v "\.d.ts"`
+npx next build
 
 echo "Source compiled to target" | indent
 
